@@ -87,6 +87,7 @@ pub fn calc_checksum(paylod: &[u8]) -> u32 {
             + ((result[3] as u32) << 0),
     )
 }
+
 #[derive(Serialize)]
 #[repr(C)]
 enum Message {
@@ -173,13 +174,8 @@ fn main() {
     };
 
     let header = MessageHeader::default();
-    //    let encoded_message: Vec<u8> = bincode::serialize(&message).unwrap();
-    //    header.checksum = calc_checksum(&encoded_message);
-    //    header.payload_len = encoded_message.len() as u32;
     let btc_message = BitcoinMessage { header, message };
 
-    //    let encoded_message: Vec<u8> = bincode::serialize(&btc_message).unwrap();
-    //    dbg!(encoded_message);
     let btc_message: SerializedBitcoinMessage = btc_message.into();
     let concated: Vec<u8> = btc_message.to_network_message(); //;
     let mut stream = TcpStream::connect(dest_address)
@@ -202,5 +198,76 @@ fn main() {
         for byte in taken.bytes() {
             println!("{}", byte.unwrap());
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_serialize_version() {
+        let expected_data = vec![
+            0xF9, 0xBE, 0xB4, 0xD9, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x65, 0x00, 0x00, 0x00, 0x0E, 0xC1, 0x1F, 0x4F, 0x71, 0x11, 0x01, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x16, 0xED, 0x64, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x4F, 0x74, 0x94, 0x76, 0x20, 0x8D,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3B, 0x2E,
+            0xB3, 0x5D, 0x8C, 0xE6, 0x17, 0x65, 0x0F, 0x2A, 0x51, 0x61, 0x74, 0x6F, 0x73, 0x68,
+            0x69, 0x3A, 0x30, 0x2E, 0x37, 0x2E, 0x32, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let str_addr = "79.116.148.118:8333".to_owned();
+        let dest_address: SocketAddr = str_addr.parse().unwrap();
+        let (address, port) = match dest_address {
+            SocketAddr::V4(addr) => (addr.ip().to_ipv6_mapped().segments(), addr.port()),
+            SocketAddr::V6(addr) => (addr.ip().segments(), addr.port()),
+        };
+
+        let mut network_address: [u16; 8] = [0; 8];
+        for (idx, net) in address.into_iter().enumerate() {
+            network_address[idx] = htons(net);
+        }
+        let recv_add = NetworkAddress {
+            services: 0,
+            addr: network_address,
+            port: htons(port),
+        };
+
+        let my_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+
+        let (address, port) = match my_addr {
+            SocketAddr::V4(addr) => (addr.ip().to_ipv6_mapped().segments(), addr.port()),
+            SocketAddr::V6(addr) => (addr.ip().segments(), addr.port()),
+        };
+
+        let send_addr = NetworkAddress {
+            services: 0,
+            addr: address,
+            port: htons(port),
+        };
+
+        let message = VersionMessage {
+            version: 70001,
+            services: 0,
+            timestamp: 1693259353,
+            recv_add,
+            addr_from: send_addr,
+            nonce: 0x6517e68c5db32e3b,
+            user_agent: [
+                0x0f, 0x2A, 0x51, 0x61, 0x74, 0x6F, 0x73, 0x68, 0x69, 0x3A, 0x30, 0x2E, 0x37, 0x2E,
+                0x32, //first byte is len
+                0x2E,
+            ], // TODO: this is hack xD
+            start_height: 0,
+            relay: false,
+        };
+
+        let header = MessageHeader::default();
+        let btc_message = BitcoinMessage { header, message };
+
+        let btc_message: SerializedBitcoinMessage = btc_message.into();
+        let serialized_message: Vec<u8> = btc_message.to_network_message();
+        assert_eq!(serialized_message, expected_data);
     }
 }
