@@ -1,5 +1,5 @@
 use std::{
-    io::{BufReader, Read, Write},
+    io::{BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
 };
 
@@ -35,6 +35,35 @@ struct BitcoinMessage {
     pub message: VersionMessage,
 }
 
+#[derive(Serialize)]
+#[repr(C)]
+struct SerializedBitcoinMessage {
+    pub header: Vec<u8>,
+    pub message: Vec<u8>,
+}
+
+impl From<BitcoinMessage> for SerializedBitcoinMessage {
+    fn from(message: BitcoinMessage) -> Self {
+        let serialized_payload = message.message.to_network_message();
+        let header = MessageHeader {
+            magin_network_nr: message.header.magin_network_nr,
+            command: message.header.command,
+            payload_len: serialized_payload.len() as u32, //TODO: error handling,
+            checksum: calc_checksum(&serialized_payload),
+        };
+        Self {
+            header: bincode::serialize(&header).unwrap(),
+            message: bincode::serialize(&message.message).unwrap(),
+        }
+    }
+}
+
+impl ToNetworkMessage for SerializedBitcoinMessage {
+    fn to_network_message(&self) -> Vec<u8> {
+        [&self.header[..], &self.message[..]].concat()
+    }
+}
+
 pub fn htons(u: u16) -> u16 {
     u.to_be()
 }
@@ -58,11 +87,11 @@ pub fn calc_checksum(paylod: &[u8]) -> u32 {
             + ((result[3] as u32) << 0),
     )
 }
-//#[derive(Serialize, PartialEq, Debug)]
-//#[repr(C)]
-//enum Message {
-//    Version(VersionMessage),
-//}
+#[derive(Serialize)]
+#[repr(C)]
+enum Message {
+    Version(VersionMessage),
+}
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
 #[repr(C, packed)]
@@ -86,10 +115,20 @@ struct VersionMessage {
     pub relay: bool,
 }
 
+trait ToNetworkMessage {
+    fn to_network_message(&self) -> Vec<u8>;
+}
+
+impl ToNetworkMessage for VersionMessage {
+    fn to_network_message(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+}
+
 fn main() {
     let str_addr = "79.116.148.118:8333".to_owned();
-    let address: SocketAddr = str_addr.parse().unwrap();
-    let (address, port) = match address {
+    let dest_address: SocketAddr = str_addr.parse().unwrap();
+    let (address, port) = match dest_address {
         SocketAddr::V4(addr) => (addr.ip().to_ipv6_mapped().segments(), addr.port()),
         SocketAddr::V6(addr) => (addr.ip().segments(), addr.port()),
     };
@@ -117,11 +156,10 @@ fn main() {
         port: htons(port),
     };
 
-    println!("{}", chrono::offset::Utc::now().timestamp());
     let message = VersionMessage {
         version: 70001,
         services: 0,
-        timestamp: 1693243341, //chrono::offset::Utc::now().timestamp(), // 0x0000000050D0B211,
+        timestamp: chrono::offset::Utc::now().timestamp(),
         recv_add,
         addr_from: send_addr,
         nonce: 0x6517e68c5db32e3b,
@@ -134,32 +172,17 @@ fn main() {
         relay: false,
     };
 
-    let mut header = MessageHeader::default();
-    let encoded_message: Vec<u8> = bincode::serialize(&message).unwrap();
-    header.checksum = calc_checksum(&encoded_message);
-    header.payload_len = encoded_message.len() as u32;
-    let btc_message = BitcoinMessage {
-        header,
-        message,
-    };
-    let encoded_message: Vec<u8> = bincode::serialize(&btc_message).unwrap();
-    println!("{:02X?}", encoded_message);
+    let header = MessageHeader::default();
+    //    let encoded_message: Vec<u8> = bincode::serialize(&message).unwrap();
+    //    header.checksum = calc_checksum(&encoded_message);
+    //    header.payload_len = encoded_message.len() as u32;
+    let btc_message = BitcoinMessage { header, message };
 
-    //    //    //    //This is a test taken from example lets validate hexdumps
-    //    //        let encoded_message = [
-    //    //            0xf9, 0xbe, 0xb4, 0xd9, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x00, 0x00, 0x00, 0x00,
-    //    //            0x00, 0x64, 0x00, 0x00, 0x00, 0x35, 0x8d, 0x49, 0x32, 0x62, 0xea, 0x00, 0x00, 0x01, 0x00,
-    //    //            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0xb2, 0xd0, 0x50, 0x00, 0x00, 0x00, 0x00, 0x01,
-    //    //            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    //    //            0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    //    //            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
-    //    //            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x2e, 0xb3, 0x5d, 0x8c, 0xe6, 0x17, 0x65, 0x0f,
-    //    //            0x2f, 0x53, 0x61, 0x74, 0x6f, 0x73, 0x68, 0x69, 0x3a, 0x30, 0x2e, 0x37, 0x2e, 0x32, 0x2f,
-    //    //            0xc0, 0x3e, 0x03, 0x00,
-    //    //        ];
-    //    //        println!("{:02X?}", encoded_message);
-    //    //
-    let mut stream = TcpStream::connect("79.116.148.118:8333")
+    //    let encoded_message: Vec<u8> = bincode::serialize(&btc_message).unwrap();
+    //    dbg!(encoded_message);
+    let btc_message: SerializedBitcoinMessage = btc_message.into();
+    let concated: Vec<u8> = btc_message.to_network_message(); //;
+    let mut stream = TcpStream::connect(dest_address)
         .map_err(|e| println!("{e}"))
         .unwrap();
     stream
@@ -167,7 +190,7 @@ fn main() {
         .expect("set_read_timeout call failed");
 
     stream
-        .write(encoded_message.as_slice())
+        .write(&concated)
         .map_err(|e| println!("{e}"))
         .unwrap();
     let read_stream = stream.try_clone().unwrap();
