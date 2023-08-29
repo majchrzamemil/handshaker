@@ -3,20 +3,20 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
-use messages::{
-    version::VersionMessageBuilder, MessageMagicNumber, SerializedBitcoinMessage, ToNetworkMessage,
-};
+use config::Config;
+use messages::{version::VersionMessageBuilder, SerializedBitcoinMessage, ToNetworkMessage};
 
 use crate::messages::{verack::VerackMessageBuilder, MessageCommand, MessageHeader};
 
+pub mod config;
 pub mod messages;
 
 fn main() {
-    let str_addr = "79.116.148.118:8333".to_owned();
-    let dest_address: SocketAddr = str_addr.parse().unwrap();
+    let config = Config::load_config().unwrap();
+    let dest_address: SocketAddr = config.dest_addr.parse().unwrap();
 
     let version_builder = VersionMessageBuilder::new(
-        MessageMagicNumber::Main,
+        config.network_type.clone(),
         dest_address,
         chrono::offset::Utc::now().timestamp(),
     );
@@ -60,7 +60,7 @@ fn main() {
                 let _readed = take.read(&mut buf).unwrap(); //We discard that, in this
                                                             //implemementation we only respond to
                                                             //version message with verack
-                let verack_message = VerackMessageBuilder::new(MessageMagicNumber::Main);
+                let verack_message = VerackMessageBuilder::new(config.network_type.clone());
                 let btc_message: SerializedBitcoinMessage = verack_message.into();
                 let serialized_message: Vec<u8> = btc_message.to_network_message();
                 stream

@@ -12,4 +12,6 @@ bytemuck = {version = "1.13.1", features =[ "derive"]}
 chrono = "0.4.26"
 nanoid = "0.4.0"
 serde = {version = "1.0.185", features = ["derive", "serde_derive"]}
+serde_json = "1.0.105"
 sha2 = "0.10.7"
+typed-builder = "0.16.0"

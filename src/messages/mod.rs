@@ -28,6 +28,8 @@ pub struct SerializedBitcoinMessage {
     pub message: Vec<u8>,
 }
 
+#[derive(Deserialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum MessageMagicNumber {
     Main,
 }
