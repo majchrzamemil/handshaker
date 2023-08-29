@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub mod verack;
 pub mod version;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -34,6 +35,7 @@ pub enum MessageMagicNumber {
 #[derive(Debug)]
 pub enum MessageCommand {
     Version,
+    Verack,
 }
 
 impl TryFrom<[u8; 12]> for MessageCommand {
@@ -43,6 +45,9 @@ impl TryFrom<[u8; 12]> for MessageCommand {
         match value {
             [0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x00, 0x00, 0x00, 0x00, 0x00] => {
                 Ok(Self::Version)
+            }
+            [0x76, 0x65, 0x72, 0x61, 0x63, 0x6B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00] => {
+                Ok(Self::Verack)
             }
             _ => Err(()), //TODO: proper error, unrecognized command
         }
@@ -66,6 +71,9 @@ impl From<MessageCommand> for [u8; 12] {
         match value {
             MessageCommand::Version => [
                 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+            MessageCommand::Verack => [
+                0x76, 0x65, 0x72, 0x61, 0x63, 0x6B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ],
         }
     }

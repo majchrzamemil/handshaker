@@ -149,4 +149,6 @@ mod test {
         let serialized_message: Vec<u8> = btc_message.to_network_message();
         assert_eq!(serialized_message, expected_data);
     }
+
+    //TODO: add test for deserialize header
 }
