@@ -1,14 +1,16 @@
 use std::{
-    io::{Read, Write},
+    io::Write,
     net::{SocketAddr, TcpStream},
 };
 
 use config::Config;
+use message_reader::MessageReader;
 use messages::{version::VersionMessageBuilder, SerializedBitcoinMessage, ToNetworkMessage};
 
-use crate::messages::{verack::VerackMessageBuilder, MessageCommand, MessageHeader};
+use crate::messages::{verack::VerackMessageBuilder, MessageCommand};
 
 pub mod config;
+pub mod message_reader;
 pub mod messages;
 
 fn main() {
@@ -34,32 +36,18 @@ fn main() {
         .write(&serialized_message)
         .map_err(|e| println!("{e}"))
         .unwrap();
-    let read_stream = stream.try_clone().unwrap();
 
-    let mut buf = [0x0; 1500]; //Just a big buffer, regular MTU
+    let mut reader = MessageReader::new(Box::new(stream.try_clone().unwrap()));
     loop {
-        //read header 24
-        let mut take = read_stream.try_clone().unwrap().take(24);
-        let readed = take.read(&mut buf[0..24]).unwrap();
-        if readed == 0 {
+        let command = if let Some(command) = reader.read_message() {
+            command
+        } else {
             continue;
-        }
-        let header: MessageHeader = bincode::deserialize(&buf[0..24]).unwrap(); //TODO: try_from
-        let command: MessageCommand = match header.command.try_into() {
-            Ok(command) => command,
-            Err(_) => continue,
         };
         dbg!(&command);
         match command {
             MessageCommand::Version => {
                 // Read the rest of payload
-                let mut take = read_stream
-                    .try_clone()
-                    .unwrap()
-                    .take(header.payload_len as u64);
-                let _readed = take.read(&mut buf).unwrap(); //We discard that, in this
-                                                            //implemementation we only respond to
-                                                            //version message with verack
                 let verack_message = VerackMessageBuilder::new(config.network_type.clone());
                 let btc_message: SerializedBitcoinMessage = verack_message.into();
                 let serialized_message: Vec<u8> = btc_message.to_network_message();

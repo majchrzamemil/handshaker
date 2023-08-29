@@ -13,11 +13,14 @@ pub struct MessageHeader {
     checksum: u32,
 }
 
-impl TryFrom<Vec<u8>> for MessageHeader {
+impl TryFrom<&[u8]> for MessageHeader {
     type Error = ();
 
-    fn try_from(_value: Vec<u8>) -> Result<Self, Self::Error> {
-        unimplemented!();
+    fn try_from(buf: &[u8]) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize(&buf[0..24]).map_err(|e| {
+            println!("{e}");
+            ()
+        })?) //TODO: proper error code
     }
 }
 
