@@ -15,13 +15,19 @@ pub struct VersionMessageBuilder {
     pub addr_recv: SocketAddr,
     pub addr_from: SocketAddr,
     pub nonce: u64,
-    pub user_agent: String,
-    pub start_height: i32,
-    pub relay: bool,
 }
 
 impl VersionMessageBuilder {
-    pub fn new(magic_number: MessageMagicNumber, addr_recv: SocketAddr, timestamp: i64) -> Self {
+    const UA: [u8; 14] = [
+        // UA is emil-handshake
+        0x65, 0x6D, 0x69, 0x6C, 0x2D, 0x68, 0x61, 0x6E, 0x64, 0x73, 0x68, 0x61, 0x6B, 0x65,
+    ];
+    pub fn new(
+        magic_number: MessageMagicNumber,
+        addr_recv: SocketAddr,
+        timestamp: i64,
+        nonce: u64,
+    ) -> Self {
         Self {
             magic_number,
             command: MessageCommand::Version,
@@ -29,42 +35,18 @@ impl VersionMessageBuilder {
             timestamp,
             addr_recv,
             addr_from: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0),
-            nonce: 0x6517e68c5db32e3b, //TODO: change for rand later
-            user_agent: String::new(), //TODO: handler UA later
-            start_height: 0,
-            relay: false,
+            nonce,
         }
     }
 }
 
 impl From<VersionMessageBuilder> for SerializedBitcoinMessage {
     fn from(value: VersionMessageBuilder) -> Self {
-        let (address, port) = match value.addr_recv {
-            SocketAddr::V4(addr) => (addr.ip().to_ipv6_mapped().segments(), addr.port()),
-            SocketAddr::V6(addr) => (addr.ip().segments(), addr.port()),
-        };
+        let recv_add = value.addr_recv.into();
 
-        let mut network_address: [u16; 8] = [0; 8];
-        for (idx, net) in address.into_iter().enumerate() {
-            network_address[idx] = htons(net);
-        }
-        let recv_add = NetworkAddress {
-            services: 0,
-            addr: network_address,
-            port: htons(port),
-        };
         let my_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+        let addr_from = my_addr.into();
 
-        let (address, port) = match my_addr {
-            SocketAddr::V4(addr) => (addr.ip().to_ipv6_mapped().segments(), addr.port()),
-            SocketAddr::V6(addr) => (addr.ip().segments(), addr.port()),
-        };
-
-        let addr_from = NetworkAddress {
-            services: 0,
-            addr: address,
-            port: port.to_be(),
-        };
         let message = VersionMessage {
             version: value.version,
             services: 0,
@@ -72,13 +54,10 @@ impl From<VersionMessageBuilder> for SerializedBitcoinMessage {
             recv_add,
             addr_from,
             nonce: value.nonce,
-            ua_len: 0x0F,
-            user_agent: [
-                0x2A, 0x51, 0x61, 0x74, 0x6F, 0x73, 0x68, 0x69, 0x3A, 0x30, 0x2E, 0x37, 0x2E, 0x32,
-                0x2E,
-            ],
-            start_height: value.start_height,
-            relay: value.relay,
+            ua_len: VersionMessageBuilder::UA.len() as u8,
+            user_agent: VersionMessageBuilder::UA,
+            start_height: 0,
+            relay: false,
         };
         let serialized_payload = message.to_network_message();
         let header = MessageHeader {
@@ -90,6 +69,26 @@ impl From<VersionMessageBuilder> for SerializedBitcoinMessage {
         Self {
             header: bincode::serialize(&header).unwrap(),
             message: bincode::serialize(&message).unwrap(),
+        }
+    }
+}
+
+impl From<SocketAddr> for NetworkAddress {
+    fn from(addr: SocketAddr) -> Self {
+        let (address, port) = match addr {
+            SocketAddr::V4(addr) => (addr.ip().to_ipv6_mapped().segments(), addr.port()),
+            SocketAddr::V6(addr) => (addr.ip().segments(), addr.port()),
+        };
+
+        let mut network_address: [u16; 8] = [0; 8];
+        for (idx, net) in address.into_iter().enumerate() {
+            network_address[idx] = htons(net);
+        }
+
+        Self {
+            services: 0,
+            addr: network_address,
+            port: port.to_be(),
         }
     }
 }
@@ -111,8 +110,7 @@ struct VersionMessage {
     addr_from: NetworkAddress,
     nonce: u64,
     ua_len: u8,
-    user_agent: [u8; 15], //&'static str, //now lets try just adding u8[] but later lets to string and impl
-    //o Message/ To bytes
+    user_agent: [u8; 14], // Just hardoded, this app doesn't allow to set your own UA
     start_height: i32,
     relay: bool,
 }
@@ -128,27 +126,29 @@ mod test {
     use super::*;
     #[test]
     fn test_serialize_version() {
-        let expected_data = vec![
+        let expected_data: Vec<u8> = vec![
             0xF9, 0xBE, 0xB4, 0xD9, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x65, 0x00, 0x00, 0x00, 0x0E, 0xC1, 0x1F, 0x4F, 0x71, 0x11, 0x01, 0x00,
+            0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x11, 0xF1, 0x11, 0x87, 0x71, 0x11, 0x01, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x16, 0xED, 0x64, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x4F, 0x74, 0x94, 0x76, 0x20, 0x8D,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3B, 0x2E,
-            0xB3, 0x5D, 0x8C, 0xE6, 0x17, 0x65, 0x0F, 0x2A, 0x51, 0x61, 0x74, 0x6F, 0x73, 0x68,
-            0x69, 0x3A, 0x30, 0x2E, 0x37, 0x2E, 0x32, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xB3, 0x5D, 0x8C, 0xE6, 0x17, 0x65, 0x0E, 0x65, 0x6D, 0x69, 0x6C, 0x2D, 0x68, 0x61,
+            0x6E, 0x64, 0x73, 0x68, 0x61, 0x6B, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         let str_addr = "79.116.148.118:8333".to_owned();
         let dest_address: SocketAddr = str_addr.parse().unwrap();
 
-        let version_builder =
-            VersionMessageBuilder::new(MessageMagicNumber::Main, dest_address, 1693259353);
+        let version_builder = VersionMessageBuilder::new(
+            MessageMagicNumber::Main,
+            dest_address,
+            1693259353,
+            0x6517e68c5db32e3b,
+        );
 
         let btc_message: SerializedBitcoinMessage = version_builder.into();
         let serialized_message: Vec<u8> = btc_message.to_network_message();
         assert_eq!(serialized_message, expected_data);
     }
-
-    //TODO: add test for deserialize header
 }

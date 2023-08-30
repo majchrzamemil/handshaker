@@ -11,8 +11,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load_config() -> Result<Self, ()> {
-        let str_config = fs::read_to_string("config.json").unwrap();
+    pub fn load_config(file_name: &str) -> Result<Self, ()> {
+        let str_config = fs::read_to_string(file_name).unwrap();
         let config: Config = serde_json::from_str(&str_config).unwrap();
         Ok(config)
     }
@@ -22,7 +22,7 @@ mod test {
     use super::*;
     #[test]
     fn test_config_loadable() {
-        let config = Config::load_config().unwrap();
+        let config = Config::load_config("config.json").unwrap();
         assert_eq!(config.network_type, MessageMagicNumber::Main);
     }
 }

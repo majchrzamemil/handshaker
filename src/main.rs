@@ -1,4 +1,6 @@
+use rand::Rng;
 use std::{
+    env,
     io::Write,
     net::{SocketAddr, TcpStream},
 };
@@ -14,13 +16,24 @@ pub mod message_reader;
 pub mod messages;
 
 fn main() {
-    let config = Config::load_config().unwrap();
+    let args: Vec<String> = env::args().collect();
+    let config_file_name = if args.len() >= 2 {
+        &args[1]
+    } else {
+        "config.json"
+    };
+
+    let config = Config::load_config(config_file_name).unwrap();
     let dest_address: SocketAddr = config.dest_addr.parse().unwrap();
+
+    let mut rng = rand::thread_rng();
+    let nonce: u64 = rng.gen();
 
     let version_builder = VersionMessageBuilder::new(
         config.network_type.clone(),
         dest_address,
         chrono::offset::Utc::now().timestamp(),
+        nonce,
     );
 
     let btc_message: SerializedBitcoinMessage = version_builder.into();
@@ -36,6 +49,7 @@ fn main() {
         .write(&serialized_message)
         .map_err(|e| println!("{e}"))
         .unwrap();
+    println!("Sending Version message");
 
     let mut reader = MessageReader::new(Box::new(stream.try_clone().unwrap()));
     loop {
@@ -44,19 +58,23 @@ fn main() {
         } else {
             continue;
         };
-        dbg!(&command);
+        println!("Received: {:?} message", &command);
         match command {
             MessageCommand::Version => {
-                // Read the rest of payload
                 let verack_message = VerackMessageBuilder::new(config.network_type.clone());
                 let btc_message: SerializedBitcoinMessage = verack_message.into();
                 let serialized_message: Vec<u8> = btc_message.to_network_message();
+                println!("{:#04X?}", &serialized_message);
                 stream
                     .write(&serialized_message)
                     .map_err(|e| println!("{e}"))
                     .unwrap();
+                println!("Sending Verack message");
             }
-            MessageCommand::Verack => break,
+            MessageCommand::Verack => {
+                println!("Hanshake with node: {:?} completed", dest_address);
+                break;
+            }
         }
     }
 }
