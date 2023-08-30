@@ -18,16 +18,6 @@ impl Config {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_config_loadable() {
-        let config = Config::load_config("config.json").unwrap();
-        assert_eq!(config.network_type, MessageMagicNumber::Main);
-    }
-}
-
 #[derive(Error, Debug)]
 pub enum ConfigLoadError {
     #[error("Error while reading file: {0}")]
@@ -43,4 +33,14 @@ pub enum ConfigLoadError {
         #[source]
         serde_json::Error,
     ),
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_config_loadable() {
+        let config = Config::load_config("config.json").unwrap();
+        assert_eq!(config.network_type, MessageMagicNumber::Main);
+    }
 }
