@@ -3,6 +3,8 @@ use sha2::{Digest, Sha256};
 
 use crate::error::Error;
 
+use self::{verack::VerackMessageBuilder, version::VersionMessageBuilder};
+
 pub mod verack;
 pub mod version;
 
@@ -23,11 +25,31 @@ impl TryFrom<&[u8]> for MessageHeader {
     }
 }
 
+pub enum Message {
+    Version(VersionMessageBuilder),
+    Verack(VerackMessageBuilder),
+}
+
+impl ToNetworkMessage for Message {
+    fn to_network_message(self) -> Result<Vec<u8>, Error> {
+        match self {
+            Message::Version(version_message) => {
+                let btc_message: SerializedBitcoinMessage = version_message.try_into()?;
+                Ok(btc_message.to_network_message()?)
+            }
+            Message::Verack(verack_message) => {
+                let btc_message: SerializedBitcoinMessage = verack_message.try_into()?;
+                Ok(btc_message.to_network_message()?)
+            }
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[repr(C)]
-pub struct SerializedBitcoinMessage {
-    pub header: Vec<u8>,
-    pub message: Vec<u8>,
+struct SerializedBitcoinMessage {
+    header: Vec<u8>,
+    message: Vec<u8>,
 }
 
 #[derive(Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -62,7 +84,7 @@ impl TryFrom<[u8; 12]> for MessageCommand {
 }
 
 pub trait ToNetworkMessage {
-    fn to_network_message(&self) -> Result<Vec<u8>, Error>;
+    fn to_network_message(self) -> Result<Vec<u8>, Error>;
 }
 
 impl From<MessageMagicNumber> for [u8; 4] {
@@ -89,7 +111,7 @@ impl From<MessageCommand> for [u8; 12] {
     }
 }
 impl ToNetworkMessage for SerializedBitcoinMessage {
-    fn to_network_message(&self) -> Result<Vec<u8>, Error> {
+    fn to_network_message(self) -> Result<Vec<u8>, Error> {
         Ok([&self.header[..], &self.message[..]].concat())
     }
 }

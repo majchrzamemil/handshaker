@@ -70,7 +70,7 @@ impl TryFrom<VersionMessageBuilder> for SerializedBitcoinMessage {
         };
         Ok(Self {
             header: bincode::serialize(&header)?,
-            message: bincode::serialize(&message)?,
+            message: serialized_payload,
         })
     }
 }
@@ -119,8 +119,8 @@ struct NetworkAddress {
 }
 
 impl ToNetworkMessage for VersionMessage {
-    fn to_network_message(&self) -> Result<Vec<u8>, Error> {
-        Ok(bincode::serialize(self)?)
+    fn to_network_message(self) -> Result<Vec<u8>, Error> {
+        Ok(bincode::serialize(&self)?)
     }
 }
 
