@@ -1,8 +1,7 @@
-use anyhow::anyhow;
 use error::Error;
 use rand::Rng;
+use std::env;
 use std::{
-    env,
     io::Write,
     net::{SocketAddr, TcpStream},
 };
@@ -18,7 +17,7 @@ pub mod error;
 pub mod message_reader;
 pub mod messages;
 
-fn run(args: Vec<String>) -> Result<(), Error> {
+pub fn run(args: Vec<String>) -> Result<(), Error> {
     let config_file_name = if args.len() >= 2 {
         &args[1]
     } else {
@@ -45,9 +44,8 @@ fn run(args: Vec<String>) -> Result<(), Error> {
     stream.set_read_timeout(None)?;
 
     println!("Sending Version message");
-    if stream.write(&serialized_message)? == 0 {
-        return Err(Error::Unexpected(anyhow!("Cannot write to socket")));
-    }
+    stream.write_all(&serialized_message)?;
+    println!("Message sent");
 
     let mut reader = MessageReader::new(Box::new(stream.try_clone()?));
     loop {
@@ -65,9 +63,8 @@ fn run(args: Vec<String>) -> Result<(), Error> {
                 let serialized_message: Vec<u8> = btc_message.to_network_message()?;
 
                 println!("Sending Verack message");
-                if stream.write(&serialized_message)? == 0 {
-                    return Err(Error::Unexpected(anyhow!("Cannot write to socket")));
-                }
+                stream.write_all(&serialized_message)?;
+                println!("Message sent");
             }
             MessageCommand::Verack => {
                 println!("Hanshake with node: {:?} completed", dest_address);

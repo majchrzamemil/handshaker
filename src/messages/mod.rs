@@ -34,6 +34,9 @@ pub struct SerializedBitcoinMessage {
 #[serde(rename_all = "lowercase")]
 pub enum MessageMagicNumber {
     Main,
+    Testnet,
+    Signet,
+    Regtest,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -66,6 +69,9 @@ impl From<MessageMagicNumber> for [u8; 4] {
     fn from(value: MessageMagicNumber) -> Self {
         match value {
             MessageMagicNumber::Main => [0xF9, 0xBE, 0xB4, 0xD9],
+            MessageMagicNumber::Testnet => [0x0B, 0x11, 0x09, 0x07],
+            MessageMagicNumber::Signet => [0x0A, 0x03, 0xCF, 0x40],
+            MessageMagicNumber::Regtest => [0xFA, 0xBF, 0xB5, 0xDA],
         }
     }
 }
