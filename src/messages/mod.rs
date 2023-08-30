@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::error::Error;
+
 pub mod verack;
 pub mod version;
 
@@ -14,13 +16,10 @@ pub struct MessageHeader {
 }
 
 impl TryFrom<&[u8]> for MessageHeader {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(buf: &[u8]) -> Result<Self, Self::Error> {
-        Ok(bincode::deserialize(&buf[0..24]).map_err(|e| {
-            println!("{e}");
-            ()
-        })?) //TODO: proper error code
+        Ok(bincode::deserialize(&buf[0..24])?)
     }
 }
 
@@ -60,7 +59,7 @@ impl TryFrom<[u8; 12]> for MessageCommand {
 }
 
 pub trait ToNetworkMessage {
-    fn to_network_message(&self) -> Vec<u8>;
+    fn to_network_message(&self) -> Result<Vec<u8>, Error>;
 }
 
 impl From<MessageMagicNumber> for [u8; 4] {
@@ -84,8 +83,8 @@ impl From<MessageCommand> for [u8; 12] {
     }
 }
 impl ToNetworkMessage for SerializedBitcoinMessage {
-    fn to_network_message(&self) -> Vec<u8> {
-        [&self.header[..], &self.message[..]].concat()
+    fn to_network_message(&self) -> Result<Vec<u8>, Error> {
+        Ok([&self.header[..], &self.message[..]].concat())
     }
 }
 
@@ -109,7 +108,7 @@ pub fn calc_checksum(paylod: &[u8]) -> u32 {
         ((result[0] as u32) << 24)
             + ((result[1] as u32) << 16)
             + ((result[2] as u32) << 8)
-            + ((result[3] as u32) << 0),
+            + (result[3] as u32),
     )
 }
 

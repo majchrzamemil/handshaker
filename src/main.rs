@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+use error::Error;
 use rand::Rng;
 use std::{
     env,
@@ -12,19 +14,19 @@ use messages::{version::VersionMessageBuilder, SerializedBitcoinMessage, ToNetwo
 use crate::messages::{verack::VerackMessageBuilder, MessageCommand};
 
 pub mod config;
+pub mod error;
 pub mod message_reader;
 pub mod messages;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+fn run(args: Vec<String>) -> Result<(), Error> {
     let config_file_name = if args.len() >= 2 {
         &args[1]
     } else {
         "config.json"
     };
 
-    let config = Config::load_config(config_file_name).unwrap();
-    let dest_address: SocketAddr = config.dest_addr.parse().unwrap();
+    let config = Config::load_config(config_file_name)?;
+    let dest_address: SocketAddr = config.dest_addr.parse()?;
 
     let mut rng = rand::thread_rng();
     let nonce: u64 = rng.gen();
@@ -36,24 +38,20 @@ fn main() {
         nonce,
     );
 
-    let btc_message: SerializedBitcoinMessage = version_builder.into();
-    let serialized_message: Vec<u8> = btc_message.to_network_message();
-    let mut stream = TcpStream::connect(dest_address)
-        .map_err(|e| println!("{e}"))
-        .unwrap();
-    stream
-        .set_read_timeout(None)
-        .expect("set_read_timeout call failed");
+    let btc_message: SerializedBitcoinMessage = version_builder.try_into()?;
+    let serialized_message: Vec<u8> = btc_message.to_network_message()?;
+    let mut stream = TcpStream::connect(dest_address)?;
 
-    stream
-        .write(&serialized_message)
-        .map_err(|e| println!("{e}"))
-        .unwrap();
+    stream.set_read_timeout(None)?;
+
     println!("Sending Version message");
+    if stream.write(&serialized_message)? == 0 {
+        return Err(Error::Unexpected(anyhow!("Cannot write to socket")));
+    }
 
-    let mut reader = MessageReader::new(Box::new(stream.try_clone().unwrap()));
+    let mut reader = MessageReader::new(Box::new(stream.try_clone()?));
     loop {
-        let command = if let Some(command) = reader.read_message() {
+        let command = if let Some(command) = reader.read_message()? {
             command
         } else {
             continue;
@@ -62,14 +60,14 @@ fn main() {
         match command {
             MessageCommand::Version => {
                 let verack_message = VerackMessageBuilder::new(config.network_type.clone());
-                let btc_message: SerializedBitcoinMessage = verack_message.into();
-                let serialized_message: Vec<u8> = btc_message.to_network_message();
-                println!("{:#04X?}", &serialized_message);
-                stream
-                    .write(&serialized_message)
-                    .map_err(|e| println!("{e}"))
-                    .unwrap();
+                //TODO: oneliner ??
+                let btc_message: SerializedBitcoinMessage = verack_message.try_into()?;
+                let serialized_message: Vec<u8> = btc_message.to_network_message()?;
+
                 println!("Sending Verack message");
+                if stream.write(&serialized_message)? == 0 {
+                    return Err(Error::Unexpected(anyhow!("Cannot write to socket")));
+                }
             }
             MessageCommand::Verack => {
                 println!("Hanshake with node: {:?} completed", dest_address);
@@ -77,4 +75,10 @@ fn main() {
             }
         }
     }
+    Ok(())
+}
+
+fn main() -> Result<(), Error> {
+    let args: Vec<String> = env::args().collect();
+    run(args)
 }

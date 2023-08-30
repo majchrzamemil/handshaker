@@ -1,8 +1,8 @@
-use std::fs;
-
-use serde::Deserialize;
+use std::{fs, io};
 
 use crate::messages::MessageMagicNumber;
+use serde::Deserialize;
+use thiserror::Error;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -11,12 +11,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load_config(file_name: &str) -> Result<Self, ()> {
-        let str_config = fs::read_to_string(file_name).unwrap();
-        let config: Config = serde_json::from_str(&str_config).unwrap();
+    pub fn load_config(file_name: &str) -> Result<Self, ConfigLoadError> {
+        let str_config = fs::read_to_string(file_name)?;
+        let config: Config = serde_json::from_str(&str_config)?;
         Ok(config)
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -25,4 +26,21 @@ mod test {
         let config = Config::load_config("config.json").unwrap();
         assert_eq!(config.network_type, MessageMagicNumber::Main);
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ConfigLoadError {
+    #[error("Error while reading file: {0}")]
+    Read(
+        #[from]
+        #[source]
+        io::Error,
+    ),
+
+    #[error("Error while deserializing config: {0}")]
+    Serde(
+        #[from]
+        #[source]
+        serde_json::Error,
+    ),
 }

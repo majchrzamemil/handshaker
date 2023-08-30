@@ -1,3 +1,5 @@
+use crate::error::Error;
+
 use super::{MessageCommand, MessageHeader, MessageMagicNumber, SerializedBitcoinMessage};
 
 pub struct VerackMessageBuilder {
@@ -13,17 +15,19 @@ impl VerackMessageBuilder {
         }
     }
 }
-impl From<VerackMessageBuilder> for SerializedBitcoinMessage {
-    fn from(value: VerackMessageBuilder) -> Self {
+impl TryFrom<VerackMessageBuilder> for SerializedBitcoinMessage {
+    type Error = Error;
+
+    fn try_from(value: VerackMessageBuilder) -> Result<Self, Self::Error> {
         let header = MessageHeader {
             magin_network_nr: value.magic_number.into(),
             command: value.command.into(),
             payload_len: 0,
             checksum: 0xF65DE2E0, //Magic value taken from docs
         };
-        Self {
-            header: bincode::serialize(&header).unwrap(),
+        Ok(Self {
+            header: bincode::serialize(&header)?,
             message: Vec::new(),
-        }
+        })
     }
 }

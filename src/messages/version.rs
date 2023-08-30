@@ -2,6 +2,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::Error;
+
 use super::{
     calc_checksum, htons, MessageCommand, MessageHeader, MessageMagicNumber,
     SerializedBitcoinMessage, ToNetworkMessage,
@@ -40,12 +42,12 @@ impl VersionMessageBuilder {
     }
 }
 
-impl From<VersionMessageBuilder> for SerializedBitcoinMessage {
-    fn from(value: VersionMessageBuilder) -> Self {
-        let recv_add = value.addr_recv.into();
+impl TryFrom<VersionMessageBuilder> for SerializedBitcoinMessage {
+    type Error = Error;
 
-        let my_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
-        let addr_from = my_addr.into();
+    fn try_from(value: VersionMessageBuilder) -> Result<Self, Self::Error> {
+        let recv_add = value.addr_recv.into();
+        let addr_from = value.addr_from.into();
 
         let message = VersionMessage {
             version: value.version,
@@ -59,17 +61,17 @@ impl From<VersionMessageBuilder> for SerializedBitcoinMessage {
             start_height: 0,
             relay: false,
         };
-        let serialized_payload = message.to_network_message();
+        let serialized_payload = message.to_network_message()?;
         let header = MessageHeader {
             magin_network_nr: value.magic_number.into(),
             command: value.command.into(),
-            payload_len: serialized_payload.len() as u32, //TODO: error handling,
+            payload_len: serialized_payload.len() as u32, //This payload will never be above u32
             checksum: calc_checksum(&serialized_payload),
         };
-        Self {
-            header: bincode::serialize(&header).unwrap(),
-            message: bincode::serialize(&message).unwrap(),
-        }
+        Ok(Self {
+            header: bincode::serialize(&header)?,
+            message: bincode::serialize(&message)?,
+        })
     }
 }
 
@@ -93,13 +95,6 @@ impl From<SocketAddr> for NetworkAddress {
     }
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone)]
-#[repr(C, packed)]
-struct NetworkAddress {
-    services: u64,
-    addr: [u16; 8],
-    port: u16,
-}
 #[derive(Serialize)]
 #[repr(C, packed)]
 struct VersionMessage {
@@ -115,9 +110,17 @@ struct VersionMessage {
     relay: bool,
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone)]
+#[repr(C, packed)]
+struct NetworkAddress {
+    services: u64,
+    addr: [u16; 8],
+    port: u16,
+}
+
 impl ToNetworkMessage for VersionMessage {
-    fn to_network_message(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+    fn to_network_message(&self) -> Result<Vec<u8>, Error> {
+        Ok(bincode::serialize(self)?)
     }
 }
 
@@ -147,8 +150,8 @@ mod test {
             0x6517e68c5db32e3b,
         );
 
-        let btc_message: SerializedBitcoinMessage = version_builder.into();
-        let serialized_message: Vec<u8> = btc_message.to_network_message();
+        let btc_message: SerializedBitcoinMessage = version_builder.try_into().unwrap();
+        let serialized_message: Vec<u8> = btc_message.to_network_message().unwrap();
         assert_eq!(serialized_message, expected_data);
     }
 }
