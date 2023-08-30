@@ -31,7 +31,10 @@ impl MessageReader {
         let header: MessageHeader = self.buffer.as_ref().try_into()?;
         let command: MessageCommand = match header.command.try_into() {
             Ok(command) => command,
-            Err(_) => return Ok(None),
+            Err(e) => {
+                eprintln!("{e}");
+                return Ok(None);
+            }
         };
         // Read the rest of the payload
         let mut data_to_read = header.payload_len as usize;

@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -68,7 +69,7 @@ pub enum MessageCommand {
 }
 
 impl TryFrom<[u8; 12]> for MessageCommand {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(value: [u8; 12]) -> Result<Self, Self::Error> {
         match value {
@@ -78,7 +79,7 @@ impl TryFrom<[u8; 12]> for MessageCommand {
             [0x76, 0x65, 0x72, 0x61, 0x63, 0x6B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00] => {
                 Ok(Self::Verack)
             }
-            _ => Err(()), //TODO: proper error, unrecognized command
+            _ => Err(Error::Unexpected(anyhow!("Unexpected message"))),
         }
     }
 }
