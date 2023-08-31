@@ -5,29 +5,45 @@ use crate::{
     messages::{MessageCommand, MessageHeader},
 };
 
-const BUFFER_SIZE: usize = 1024;
+/// The size of the buffer used for reading from the stream.
+const BUFFER_SIZE: usize = 1024; //1k just because
 
+/// Represents a reader for Bitcoin messages.
 pub struct MessageReader {
-    buffer: [u8; BUFFER_SIZE], //Just a 1k buffer
+    buffer: [u8; BUFFER_SIZE],
     reader: Box<dyn Read>,
 }
 
 impl MessageReader {
+    /// The size of a message header.
     const HEADER_SIZE: u64 = 24;
+
+    /// Creates a new instance of `MessageReader` with the given reader.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - A reader implementing the `Read` trait.
     pub fn new(reader: Box<dyn Read>) -> Self {
         Self {
-            buffer: [0x0; 1024],
+            buffer: [0x0; BUFFER_SIZE],
             reader,
         }
     }
-
+    /// Reads a Bitcoin message from the underlying stream.
+    ///
+    /// Returns the parsed `MessageCommand` if successful. If the read was successful
+    /// but no more data is available (end of stream), or message is unrecognized `Ok(None)` is returned.
+    /// If an error occurs during reading or parsing, an `Error` is returned.
     pub fn read_message(&mut self) -> Result<Option<MessageCommand>, Error> {
         // Read header
         let mut take = self.reader.as_mut().take(MessageReader::HEADER_SIZE);
         let readed = take.read(&mut self.buffer[0..MessageReader::HEADER_SIZE as usize])?;
+
         if readed == 0 {
             return Ok(None);
         }
+
+        // Parse header
         let header: MessageHeader = self.buffer.as_ref().try_into()?;
         let command: MessageCommand = match header.command.try_into() {
             Ok(command) => command,
@@ -36,8 +52,10 @@ impl MessageReader {
                 return Ok(None);
             }
         };
+
         // Read the rest of the payload
         let mut data_to_read = header.payload_len as usize;
+        // Limiting number of iteration so we won't end up in infinite loop
         let mut it = 0;
         loop {
             let bytes_to_read = if data_to_read > BUFFER_SIZE {
@@ -49,7 +67,7 @@ impl MessageReader {
             let readed = take.read(&mut self.buffer)?;
             data_to_read -= readed;
             it += 1;
-            if data_to_read == 0 || it > 2 {
+            if data_to_read == 0 || it > 10 {
                 break;
             }
         }

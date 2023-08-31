@@ -9,6 +9,7 @@ use self::{verack::VerackMessageBuilder, version::VersionMessageBuilder};
 pub mod verack;
 pub mod version;
 
+/// Represents a message header for communication with Bitcoin nodes.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[repr(C)]
 pub struct MessageHeader {
@@ -18,17 +19,73 @@ pub struct MessageHeader {
     checksum: u32,
 }
 
+/// A trait for types that can be converted into a network message payload.
+pub trait ToNetworkMessage {
+    /// Converts the implementing type into a network message payload.
+    ///
+    /// Returns a `Result` containing the binary representation of the message payload
+    /// if the conversion is successful. If an error occurs during the conversion,
+    /// an `Error` is returned.
+    fn to_network_message(self) -> Result<Vec<u8>, Error>;
+}
+
+/// Enum representing different types of messages that can be sent to Bitcoin nodes.
+pub enum Message {
+    Version(VersionMessageBuilder),
+    Verack(VerackMessageBuilder),
+}
+
+/// Enum representing magic numbers for Bitcoin networks.
+#[derive(Deserialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageMagicNumber {
+    Main,
+    Testnet,
+    Signet,
+    Regtest,
+}
+
+/// Enum representing different types of message commands.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MessageCommand {
+    Version,
+    Verack,
+}
+
+/// Converts a u16 to network byte order (big-endian).
+pub fn htons(u: u16) -> u16 {
+    u.to_be()
+}
+
+/// Converts a u32 to network byte order (big-endian).
+pub fn htonl(u: u32) -> u32 {
+    u.to_be()
+}
+
+/// Calculates the checksum for a payload. According to bitcoin spec
+/// checksum consist of 4 first byes of sha256(sha256(payload))
+pub fn calc_checksum(paylod: &[u8]) -> u32 {
+    let mut hasher = Sha256::new();
+    hasher.update(paylod);
+    let result = hasher.finalize();
+    let mut hasher = Sha256::new();
+    hasher.update(result.as_slice());
+    let result = hasher.finalize();
+
+    htonl(
+        ((result[0] as u32) << 24)
+            + ((result[1] as u32) << 16)
+            + ((result[2] as u32) << 8)
+            + (result[3] as u32),
+    )
+}
+
 impl TryFrom<&[u8]> for MessageHeader {
     type Error = Error;
 
     fn try_from(buf: &[u8]) -> Result<Self, Self::Error> {
         Ok(bincode::deserialize(&buf[0..24])?)
     }
-}
-
-pub enum Message {
-    Version(VersionMessageBuilder),
-    Verack(VerackMessageBuilder),
 }
 
 impl ToNetworkMessage for Message {
@@ -53,21 +110,6 @@ struct SerializedBitcoinMessage {
     message: Vec<u8>,
 }
 
-#[derive(Deserialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum MessageMagicNumber {
-    Main,
-    Testnet,
-    Signet,
-    Regtest,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum MessageCommand {
-    Version,
-    Verack,
-}
-
 impl TryFrom<[u8; 12]> for MessageCommand {
     type Error = Error;
 
@@ -82,10 +124,6 @@ impl TryFrom<[u8; 12]> for MessageCommand {
             _ => Err(Error::Unexpected(anyhow!("Unexpected message"))),
         }
     }
-}
-
-pub trait ToNetworkMessage {
-    fn to_network_message(self) -> Result<Vec<u8>, Error>;
 }
 
 impl From<MessageMagicNumber> for [u8; 4] {
@@ -111,34 +149,11 @@ impl From<MessageCommand> for [u8; 12] {
         }
     }
 }
+
 impl ToNetworkMessage for SerializedBitcoinMessage {
     fn to_network_message(self) -> Result<Vec<u8>, Error> {
         Ok([&self.header[..], &self.message[..]].concat())
     }
-}
-
-pub fn htons(u: u16) -> u16 {
-    u.to_be()
-}
-
-pub fn htonl(u: u32) -> u32 {
-    u.to_be()
-}
-
-pub fn calc_checksum(paylod: &[u8]) -> u32 {
-    let mut hasher = Sha256::new();
-    hasher.update(paylod);
-    let result = hasher.finalize();
-    let mut hasher = Sha256::new();
-    hasher.update(result.as_slice());
-    let result = hasher.finalize();
-
-    htonl(
-        ((result[0] as u32) << 24)
-            + ((result[1] as u32) << 16)
-            + ((result[2] as u32) << 8)
-            + (result[3] as u32),
-    )
 }
 
 #[cfg(test)]

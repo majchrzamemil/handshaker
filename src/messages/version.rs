@@ -9,21 +9,38 @@ use super::{
     SerializedBitcoinMessage, ToNetworkMessage,
 };
 
+/// Represents a builder for creating a Version message.
 pub struct VersionMessageBuilder {
+    /// The magic number for the Bitcoin network.
     pub magic_number: MessageMagicNumber,
+    /// The message command (always MessageCommand::Version).
     pub command: MessageCommand,
+    /// The Bitcoin protocol version.
     pub version: i32,
+    /// The timestamp of the message.
     pub timestamp: i64,
+    /// The receiving address.
     pub addr_recv: SocketAddr,
+    /// The source address.
     pub addr_from: SocketAddr,
+    /// A random nonce.
     pub nonce: u64,
 }
 
 impl VersionMessageBuilder {
+    /// The User Agent in this case is set to "emil-handshake", which is a predefined string.
+    /// This application does not allow for customization of the User Agent.
     const UA: [u8; 14] = [
-        // UA is emil-handshake
         0x65, 0x6D, 0x69, 0x6C, 0x2D, 0x68, 0x61, 0x6E, 0x64, 0x73, 0x68, 0x61, 0x6B, 0x65,
     ];
+    /// Creates a new instance of `VersionMessageBuilder`.
+    ///
+    /// # Arguments
+    ///
+    /// * `magic_number` - The magic number for the Bitcoin network.
+    /// * `addr_recv` - The receiving socket address.
+    /// * `timestamp` - The timestamp of the message.
+    /// * `nonce` - A nonce value.
     pub fn new(
         magic_number: MessageMagicNumber,
         addr_recv: SocketAddr,
@@ -96,7 +113,7 @@ impl From<SocketAddr> for NetworkAddress {
 }
 
 #[derive(Serialize)]
-#[repr(C, packed)]
+#[repr(C)]
 struct VersionMessage {
     version: i32,
     services: u64,
@@ -111,7 +128,7 @@ struct VersionMessage {
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
-#[repr(C, packed)]
+#[repr(C)]
 struct NetworkAddress {
     services: u64,
     addr: [u16; 8],
