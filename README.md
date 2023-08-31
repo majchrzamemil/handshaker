@@ -1,17 +1,27 @@
-# handshaker
-The handshaker is a tool used for establishing handshake with provided bitcoin node. Bitcoin protocol defines handshake as shown bellow![btc_handshake](https://github.com/majchrzamemil/handshaker/assets/17731933/23f54a3f-8337-406e-8bd4-a364d4274f4c)
+# Handshaker
+
+**Handshaker** is a utility designed to streamline the process of establishing a handshake with a provided Bitcoin node. The Bitcoin protocol defines this handshake process, illustrated below:
+![btc_handshake](https://github.com/majchrzamemil/handshaker/assets/17731933/23f54a3f-8337-406e-8bd4-a364d4274f4c)
+
 ## Configuration
-In order to choose a node to connect to user needs to configure config file: `config.json` or provide own file as a command line argument. Structure of config file:
-`
+
+To connect with a specific node, users have the option to either configure the `config.json` file or provide a custom configuration file as a command line argument. The structure of the configuration file is as follows:
+
+```json
 {
   "dest_addr": "94.130.79.4:8333",
   "network_type": "main"
 }
-`<br />
-Handshaker allow both IPv4 and IPv6 addrresses. Allowed network types: main, testnet, signet, regtest.<br />
-This project has been tested on arm MacOs with nodes from main net and IPv4 addresses.
-## Validation of handshake
-Successful handshake should result in output: </br>
+```
+
+Handshaker supports both IPv4 and IPv6 addresses. Users can select from a variety of allowed network types, including main, testnet, signet, and regtest.
+
+**Note:** This project has been rigorously tested on arm-based macOS systems, utilizing nodes from the main network and IPv4 addresses.
+
+## Handshake Validation
+
+A successful handshake will yield the following output:
+
 ```
 Sending Version message
 Message sent
@@ -19,6 +29,7 @@ Received: Version message
 Sending Verack message
 Message sent
 Received: Verack message
-Hanshake with node: 94.130.79.4:8333 completed
+Handshake with node: 94.130.79.4:8333 completed
 ```
-Failed hanshake will result with appropriate error message. There is no timeout for sending message so when no output is visible choosen node is inactive, in that case send SIGINT and try again with diffrent node.
+
+In the event of a failed handshake, an appropriate error message will be displayed. It's important to note that there is no timeout for sending messages. If no output is visible, it signifies that the chosen node is inactive. In such cases, send a SIGINT signal and attempt the process again with a different node.
