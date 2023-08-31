@@ -2,7 +2,7 @@ use std::io::Read;
 
 use crate::{
     error::Error,
-    messages::{MessageCommand, MessageHeader},
+    messages::message::{MessageCommand, MessageHeader},
 };
 
 /// The size of the buffer used for reading from the stream.

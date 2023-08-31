@@ -1,8 +1,9 @@
 use std::{fs, io};
 
-use crate::messages::MessageMagicNumber;
 use serde::Deserialize;
 use thiserror::Error;
+
+use crate::messages::message::MessageMagicNumber;
 
 /// Represents configuration data for the `handshaker`.
 #[derive(Deserialize)]

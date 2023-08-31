@@ -5,8 +5,11 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 
 use super::{
-    calc_checksum, htons, MessageCommand, MessageHeader, MessageMagicNumber,
-    SerializedBitcoinMessage, ToNetworkMessage,
+    message::{
+        calc_checksum, htons, MessageCommand, MessageHeader, MessageMagicNumber,
+        SerializedBitcoinMessage,
+    },
+    ToNetworkMessage,
 };
 
 /// Represents a builder for creating a Version message.

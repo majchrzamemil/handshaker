@@ -1,6 +1,8 @@
 use crate::error::Error;
 
-use super::{htonl, MessageCommand, MessageHeader, MessageMagicNumber, SerializedBitcoinMessage};
+use super::message::{
+    htonl, MessageCommand, MessageHeader, MessageMagicNumber, SerializedBitcoinMessage,
+};
 
 /// Represents a builder for creating a Verack message.
 pub struct VerackMessageBuilder {

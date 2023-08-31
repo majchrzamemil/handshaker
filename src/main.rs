@@ -8,10 +8,11 @@ use std::{
 
 use config::Config;
 use message_reader::MessageReader;
-use messages::{version::VersionMessageBuilder, ToNetworkMessage};
+use messages::version::VersionMessageBuilder;
 
-use crate::messages::Message;
-use crate::messages::{verack::VerackMessageBuilder, MessageCommand};
+use crate::messages::message::{Message, MessageCommand};
+use crate::messages::verack::VerackMessageBuilder;
+use crate::messages::ToNetworkMessage;
 
 pub mod config;
 pub mod error;
